@@ -1,0 +1,195 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>БригадаПро — Подать заявку</title>
+  <style>
+    :root { --teal:#0d6e75; --teal-dark:#0a5a60; --bg:#f7f5f1; --card:#fff; --text:#222; --muted:#6b7280; --border:#d7d7d7; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:Arial, Helvetica, sans-serif; background:var(--bg); color:var(--text); }
+    .wrap { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .card { width:100%; max-width:420px; background:var(--card); border-radius:18px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:22px; }
+    .brand { display:flex; align-items:center; gap:10px; font-weight:700; margin-bottom:16px; }
+    .logo { width:34px; height:34px; border-radius:8px; background:var(--teal); color:#fff; display:flex; align-items:center; justify-content:center; font-size:18px; }
+    h1 { font-size:22px; margin:8px 0 6px; }
+    .sub { color:var(--muted); font-size:13px; margin-bottom:18px; }
+    label { display:block; font-size:13px; font-weight:700; margin:12px 0 6px; }
+    input, select, textarea { width:100%; padding:11px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; outline:none; background:#fff; }
+    input:focus, select:focus, textarea:focus { border-color:var(--teal); box-shadow:0 0 0 3px rgba(13,110,117,.08); }
+    textarea { min-height:86px; resize:vertical; }
+    .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .hint { margin-top:6px; font-size:12px; color:var(--muted); }
+    .error { display:none; margin-top:10px; padding:10px 12px; background:#fff3f3; color:#b91c1c; border:1px solid #fecaca; border-radius:8px; font-size:13px; }
+    .success { display:none; margin-top:10px; padding:10px 12px; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; border-radius:8px; font-size:13px; }
+    button { width:100%; margin-top:16px; border:none; border-radius:9px; padding:13px 14px; background:var(--teal); color:#fff; font-size:15px; font-weight:700; cursor:pointer; }
+    button:hover { background:var(--teal-dark); }
+    button:disabled { opacity:.7; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="brand"><div class="logo">📋</div><div>БригадаПро</div></div>
+      <h1>Заявка на выход</h1>
+      <div class="sub">Заполните форму перед началом работ</div>
+
+      <form id="orderForm">
+        <div class="row">
+          <div>
+            <label for="fio">ФИО *</label>
+            <input id="fio" name="fio" placeholder="Иванов И.И." required>
+          </div>
+          <div>
+            <label for="phone">Телефон *</label>
+            <input id="phone" name="phone" placeholder="+7 999 000 00 00" required>
+          </div>
+        </div>
+
+        <label for="object">Объект *</label>
+        <select id="object" name="object" required>
+          <option value="">Загрузка объектов...</option>
+        </select>
+        <div class="hint">Если список не появился, откройте JSON-эндпоинт и проверьте ответ.</div>
+        <div id="objectError" class="error"></div>
+
+        <div class="row">
+          <div>
+            <label for="work_type">Вид работ *</label>
+            <select id="work_type" name="work_type" required>
+              <option value="">Выберите...</option>
+              <option>Монтаж</option>
+              <option>Демонтаж</option>
+              <option>Диагностика</option>
+              <option>Ремонт</option>
+            </select>
+          </div>
+          <div>
+            <label for="date">Дата и время *</label>
+            <input id="date" name="date" type="datetime-local" required>
+          </div>
+        </div>
+
+        <label for="inn">ИНН (для самозанятых)</label>
+        <input id="inn" name="inn" placeholder="000000000000">
+
+        <label for="note">Примечание</label>
+        <textarea id="note" name="note" placeholder="Дополнительная информация..."></textarea>
+
+        <div id="ok" class="success"></div>
+        <button id="submitBtn" type="submit">Отправить заявку</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyG2JmT2eFpgulJ_axitel9xrodpksP2eoegKMXXtmTTF1hTYDntdexyD4U-vcsqbbJ/exec';
+
+    function showError(msg) {
+      const box = document.getElementById('objectError');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    function hideError() {
+      const box = document.getElementById('objectError');
+      box.textContent = '';
+      box.style.display = 'none';
+    }
+
+    function showOk(msg) {
+      const box = document.getElementById('ok');
+      box.textContent = msg;
+      box.style.display = 'block';
+    }
+
+    async function loadObjects() {
+      const sel = document.getElementById('object');
+      hideError();
+      sel.innerHTML = '<option value="">Загрузка...</option>';
+
+      try {
+        const res = await fetch(SCRIPT_URL + '?type=objects', { cache: 'no-store' });
+        const text = await res.text();
+        console.log('objects raw:', text);
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (e) {
+          throw new Error('Скрипт вернул не JSON');
+        }
+
+        if (data && data.ok === false) {
+          throw new Error(data.error || 'Ошибка API');
+        }
+        if (!Array.isArray(data)) {
+          throw new Error('Ожидался массив объектов');
+        }
+
+        const items = data
+          .map(o => String(o.Название || o.name || o.Объект || o.object || '').trim())
+          .filter(Boolean);
+
+        sel.innerHTML = '<option value="">Выберите объект...</option>';
+        items.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          sel.appendChild(opt);
+        });
+
+        if (!items.length) {
+          sel.innerHTML = '<option value="">Объекты не найдены</option>';
+          showError('JSON получен, но список пуст. Проверьте, что в листе есть строка заголовков и данные начинаются со 2-й строки.');
+        }
+      } catch (err) {
+        sel.innerHTML = '<option value="">Введите вручную:</option>';
+        showError('Не удалось загрузить объекты: ' + err.message);
+      }
+    }
+
+    document.getElementById('orderForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submitBtn');
+      btn.disabled = true;
+      btn.textContent = 'Отправка...';
+      hideError();
+
+      const payload = {
+        action: 'new_order',
+        fio: document.getElementById('fio').value.trim(),
+        contact: document.getElementById('phone').value.trim(),
+        object: document.getElementById('object').value.trim(),
+        work_type: document.getElementById('work_type').value.trim(),
+        date: document.getElementById('date').value.trim(),
+        worker_inn: document.getElementById('inn').value.trim(),
+        note: document.getElementById('note').value.trim()
+      };
+
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
+        });
+        const text = await res.text();
+        const data = JSON.parse(text);
+        if (!data.ok) throw new Error(data.error || 'Ошибка отправки');
+        showOk('Заявка отправлена. № ' + (data.order_num || '—'));
+        this.reset();
+        await loadObjects();
+      } catch (err) {
+        showError('Не удалось отправить заявку: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Отправить заявку';
+      }
+    });
+
+    loadObjects();
+  </script>
+</body>
+</html>
