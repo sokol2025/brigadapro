@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>БригадаПро — Подать заявку</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Inter,sans-serif;background:#f7f6f2;min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:1.5rem}
+.card{background:#fff;border-radius:16px;padding:2.5rem;width:100%;max-width:460px;box-shadow:0 4px 24px rgba(0,0,0,.10)}
+.logo{display:flex;align-items:center;gap:.75rem;margin-bottom:1.75rem;padding-bottom:1.25rem;border-bottom:1px solid #eee}
+.logo-mark{width:36px;height:36px;background:#01696f;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px}
+.logo-text{font-size:.95rem;font-weight:700;color:#1a1a1a}
+h1{font-size:1.25rem;font-weight:700;margin-bottom:.3rem}
+.sub{font-size:.8rem;color:#888;margin-bottom:1.75rem}
+.field{margin-bottom:1.1rem}
+label{display:block;font-size:.8rem;font-weight:600;margin-bottom:.35rem;color:#333}
+input,select,textarea{width:100%;padding:.65rem .9rem;border:1.5px solid #ddd;border-radius:8px;font-family:Inter,sans-serif;font-size:.85rem;color:#111;outline:none;transition:border .15s}
+input:focus,select:focus,textarea:focus{border-color:#01696f;box-shadow:0 0 0 3px rgba(1,105,111,.1)}
+textarea{resize:vertical;min-height:70px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:.85rem}
+.btn{width:100%;padding:.8rem;background:#01696f;color:#fff;border:none;border-radius:8px;font-size:.9rem;font-weight:600;cursor:pointer;margin-top:.5rem;transition:background .15s}
+.btn:hover{background:#0c4e54}
+.btn:disabled{background:#aaa;cursor:not-allowed}
+.success{background:#d4efcc;border:1px solid #437a22;border-radius:8px;padding:1rem;color:#2e5c10;font-size:.85rem;font-weight:500;display:none;text-align:center;margin-top:1rem}
+.required{color:#c0392b}
+@media(max-width:480px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <div class="logo-mark">📋</div>
+    <span class="logo-text">БригадаПро</span>
+  </div>
+  <h1>Заявка на выход</h1>
+  <p class="sub">Заполните форму перед началом работ</p>
+  <form id="form">
+    <div class="row">
+      <div class="field">
+        <label>ФИО <span class="required">*</span></label>
+        <input type="text" id="name" required placeholder="Иванов И.И.">
+      </div>
+      <div class="field">
+        <label>Телефон <span class="required">*</span></label>
+        <input type="tel" id="phone" required placeholder="+7 999 000 00 00">
+      </div>
+    </div>
+    <div class="field">
+      <label>Объект <span class="required">*</span></label>
+      <select id="object" required>
+        <option value="">Загрузка...</option>
+      </select>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label>Вид работ <span class="required">*</span></label>
+        <select id="work_type" required>
+          <option value="">Выберите...</option>
+          <option>Монтаж</option>
+          <option>Демонтаж</option>
+          <option>Погрузочно-разгрузочные</option>
+          <option>Уборка</option>
+          <option>Охрана</option>
+          <option>Другое</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Дата и время</label>
+        <input type="datetime-local" id="date">
+      </div>
+    </div>
+    <div class="field">
+      <label>ИНН (для самозанятых)</label>
+      <input type="text" id="inn" placeholder="000000000000" maxlength="12">
+    </div>
+    <div class="field">
+      <label>Примечание</label>
+      <textarea id="note" placeholder="Дополнительная информация..."></textarea>
+    </div>
+    <button type="submit" class="btn" id="submit-btn">Отправить заявку</button>
+    <div class="success" id="success">
+      ✅ Заявка принята! Ожидайте подтверждения от администратора.
+    </div>
+  </form>
+</div>
+
+<script>
+// ⚠️ ЗАМЕНИТЕ НА ВАШ URL из Google Apps Script
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyttimFLv9JzZYWGWVwmP9Y_s9BobxVtmfHrVjUsm8DjpVYwAkC8SXJFU7OkgA5HxCU/exec';
+
+// Загрузка объектов из таблицы
+async function loadObjects() {
+  try {
+    const res = await fetch(SCRIPT_URL + '?type=objects');
+    const data = await res.json();
+    const sel = document.getElementById('object');
+    sel.innerHTML = '<option value="">Выберите объект...</option>';
+    data.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o['Название'] || o[Object.keys(o)[0]];
+      opt.textContent = opt.value;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    document.getElementById('object').innerHTML =
+      '<option value="">Введите вручную:</option>';
+  }
+}
+loadObjects();
+
+// Отправка формы
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Отправка...';
+
+  const payload = {
+    action:    'new_order',
+    workers:   document.getElementById('name').value,
+    object:    document.getElementById('object').value,
+    work_type: document.getElementById('work_type').value,
+    date:      document.getElementById('date').value,
+    note:      document.getElementById('note').value,
+    worker_inn: document.getElementById('inn').value,
+    contact:   document.getElementById('phone').value,
+  };
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    document.getElementById('success').style.display = 'block';
+    document.getElementById('form').reset();
+  } catch(err) {
+    alert('Ошибка отправки. Попробуйте ещё раз.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Отправить заявку';
+  }
+});
+</script>
+</body>
+</html>
